@@ -1,0 +1,45 @@
+datasource db {
+  // เริ่มต้นด้วย sqlite เพื่อให้รันในเครื่องได้ทันทีโดยไม่ต้องลง PostgreSQL
+  // หากจะ Deploy ขึ้น Production (Supabase, Render, Neon) ให้เปลี่ยน provider เป็น "postgresql"
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String     @id @default(uuid())
+  username     String     @unique
+  pinHash      String     // รหัส PIN 4 หลักที่ผ่านการ Hash ด้วย bcrypt
+  role         String     @default("USER") // "USER" หรือ "ADMIN"
+  lineUserId   String?    @unique // เก็บ LINE User ID หลังจากพิมพ์ชื่อในแชท LINE
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  reminders    Reminder[]
+}
+
+model Reminder {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title            String    // เช่น "บัตรเครดิต KBank", "ค่าไฟบ้าน"
+  category         String    @default("CREDIT_CARD") // "CREDIT_CARD", "BILL", "GENERAL"
+  amount           Float?    // ยอดเงินที่ต้องชำระ
+  
+  // สำหรับบัตรเครดิต: รอบบิล
+  cycleStartDate   Int?      // วันที่เริ่มรอบบิล เช่น 20
+  cycleEndDate     Int?      // วันที่ตัดรอบบิล เช่น 19 ของเดือนถัดไป
+  dueDate          DateTime  // วันที่ครบกำหนดชำระจริง
+  
+  notifyDaysBefore Int       @default(3) // แจ้งเตือนล่วงหน้ากี่วัน (เช่น 1, 3, 7 วัน)
+  isRecurring      Boolean   @default(true) // เตือนซ้ำทุกเดือนหรือไม่
+  isActive         Boolean   @default(true) // เปิด/ปิดการแจ้งเตือน
+  lastNotifiedAt   DateTime? // วันที่ส่งแจ้งเตือนล่าสุด
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
